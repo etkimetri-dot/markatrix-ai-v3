@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Community Manager - Yönetim Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-indigo-600 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">🚀 AI Community Manager</h1>
+            <span>Admin Paneli</span>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 mt-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Tek Tıkla Bağlanma (SaaS OAuth) -->
+            <div class="bg-indigo-50 p-6 rounded-lg shadow-md border border-indigo-200">
+                <h2 class="text-2xl font-semibold mb-2 text-indigo-800">SaaS Hızlı Kurulum 🚀</h2>
+                <p class="text-sm text-indigo-600 mb-4">Müşterilerinizin (veya arkadaşınızın) şifre vb. girmeden tek tıkla Instagram'ını yapay zekaya bağlaması için bu butonu kullanın.</p>
+                <a href="/auth/login" class="block text-center w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition">
+                    <span class="mr-2">📘</span> Instagram ile Giriş Yap
+                </a>
+            </div>
+
+            <!-- Yeni Müşteri Ekleme Formu (Manuel) -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Manuel Marka Ekle (Geliştirici)</h2>
+                <form id="brandForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Marka Adı</label>
+                        <input type="text" id="brandName" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required placeholder="Örn: Ayşe Butik">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Instagram Sayfa ID</label>
+                        <input type="text" id="pageId" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required placeholder="Örn: 178414596...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Instagram Access Token</label>
+                        <input type="text" id="token" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required placeholder="EAAGm0...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Yapay Zeka Karakteri & Fiyat Listesi</label>
+                        <textarea id="prompt" rows="5" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required placeholder="Sen Ayşe Butik'in yapay zeka asistanısın. Elbiseler 500 TL..."></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Markayı Sisteme Kaydet</button>
+                </form>
+            </div>
+
+            <!-- Kayıtlı Markalar Listesi -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Sisteme Kayıtlı Markalar</h2>
+                <div id="brandsList" class="space-y-4">
+                    <p class="text-gray-500">Yükleniyor...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        async function fetchBrands() {
+            const response = await fetch('/api/brands');
+            const data = await response.json();
+            const list = document.getElementById('brandsList');
+            list.innerHTML = '';
+
+            for (const [id, brand] of Object.entries(data.brands)) {
+                list.innerHTML += `
+                    <div class="p-4 border border-gray-200 rounded-md bg-gray-50">
+                        <h3 class="font-bold text-lg text-indigo-600">${brand.name}</h3>
+                        <p class="text-sm text-gray-600">ID: ${id}</p>
+                        <p class="text-sm text-gray-500 mt-2 truncate line-clamp-2">${brand.system_prompt}</p>
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('brandForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pageId = document.getElementById('pageId').value;
+            const payload = {
+                name: document.getElementById('brandName').value,
+                access_token: document.getElementById('token').value,
+                system_prompt: document.getElementById('prompt').value
+            };
+
+            const res = await fetch(`/api/brands/${pageId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alert('Marka başarıyla kaydedildi! Yapay zeka anında aktif.');
+                document.getElementById('brandForm').reset();
+                fetchBrands();
+            }
+        });
+
+        fetchBrands();
+    </script>
+</body>
+</html>
