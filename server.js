@@ -49,17 +49,17 @@ app.use(express.json({
   }
 }));
 
-// --- OAUTH 2.0 (TEK TIKLA GİRİŞ) SİSTEMİ ---
-const FB_CLIENT_ID = '2341013213402646'; // Sizin App ID'niz
+// --- OAUTH 2.0 (TEK TIKLA INSTAGRAM GİRİŞİ) ---
+const IG_CLIENT_ID = '1969740220390086'; // Yeni Instagram App ID'niz
 
-// Müşteriyi Facebook Login ekranına yönlendir
+// Müşteriyi Instagram Login ekranına yönlendir
 app.get('/auth/login', (req, res) => {
   const dynamicRedirectUri = `https://${req.get('host')}/auth/callback`;
-  const fbLoginUrl = `https://www.facebook.com/v25.0/dialog/oauth?client_id=${FB_CLIENT_ID}&redirect_uri=${dynamicRedirectUri}&response_type=code&scope=instagram_basic,instagram_manage_messages,pages_show_list,pages_read_engagement`;
-  res.redirect(fbLoginUrl);
+  const igLoginUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_CLIENT_ID}&redirect_uri=${dynamicRedirectUri}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments`;
+  res.redirect(igLoginUrl);
 });
 
-// Facebook'tan dönen kodu alıp Token'a çevir (ve veritabanına kaydet)
+// Instagram'dan dönen kodu alıp Token'a çevir (ve veritabanına kaydet)
 app.get('/auth/callback', async (req, res) => {
   const dynamicRedirectUri = `https://${req.get('host')}/auth/callback`;
   const code = req.query.code;
@@ -69,44 +69,34 @@ app.get('/auth/callback', async (req, res) => {
     const axios = require('axios');
     const fs = require('fs');
     
-    // 1. Kodu Access Token'a çevir
-    const tokenResponse = await axios.get(`https://graph.facebook.com/v25.0/oauth/access_token?client_id=${FB_CLIENT_ID}&redirect_uri=${dynamicRedirectUri}&client_secret=${process.env.IG_APP_SECRET}&code=${code}`);
+    // 1. Kodu Access Token'a çevir (Instagram API form-urlencoded bekler)
+    const formData = new URLSearchParams();
+    formData.append('client_id', IG_CLIENT_ID);
+    formData.append('client_secret', process.env.IG_APP_SECRET);
+    formData.append('grant_type', 'authorization_code');
+    formData.append('redirect_uri', dynamicRedirectUri);
+    formData.append('code', code);
+
+    const tokenResponse = await axios.post('https://api.instagram.com/oauth/access_token', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    
     const userAccessToken = tokenResponse.data.access_token;
+    const igId = tokenResponse.data.user_id;
 
-    // 2. Kullanıcının sahip olduğu Facebook Sayfalarını ve Instagram Hesaplarını bul
-    const pagesResponse = await axios.get(`https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${userAccessToken}`);
-    const pages = pagesResponse.data.data;
-
-    let savedBrands = 0;
     let db = { brands: {} };
     try { db = JSON.parse(fs.readFileSync('./database.json', 'utf8')); } catch (err) {}
 
-    // 3. Bulunan tüm Instagram hesaplarını veritabanına ekle
-    for (const page of pages) {
-      if (page.instagram_business_account) {
-        const igId = page.instagram_business_account.id;
-        db.brands[igId] = {
-          name: page.name + " (Otomatik Kayıt)",
-          access_token: page.access_token, // Sayfa token'ı webhooklarda mesaj atabilmek için gereklidir
-          system_prompt: `Sen ${page.name} markasının asistanısın. Müşterilere profesyonel ve kısa cevaplar ver.`
-        };
-        savedBrands++;
-        
-        // 4. (Opsiyonel) Sayfayı bizim webhook'umuza otomatik abone yap
-        await axios.post(`https://graph.facebook.com/v25.0/${page.id}/subscribed_apps`, 
-          { subscribed_fields: ['messages', 'messaging_postbacks'] },
-          { headers: { 'Authorization': `Bearer ${page.access_token}` } }
-        ).catch(e => console.log('Otomatik webhook aboneliği başarısız (İzin eksik olabilir).', e.message));
-      }
-    }
+    // 2. Instagram hesabını veritabanına ekle
+    db.brands[igId] = {
+      name: "Yeni Müşteri (Instagram'dan Bağlandı)",
+      access_token: userAccessToken,
+      system_prompt: `Sen profesyonel bir asistansın. Müşterilere doğrudan ve kısa cevaplar ver.`
+    };
 
     fs.writeFileSync('./database.json', JSON.stringify(db, null, 2));
 
-    if (savedBrands > 0) {
-      res.send(`<h1>Tebrikler! 🎉</h1><p>${savedBrands} adet Instagram hesabı sisteme başarıyla bağlandı. Artık yapay zekanız devrede. <a href="/">Panele Dön</a></p>`);
-    } else {
-      res.send('<h1>Hesap Bulunamadı</h1><p>Facebook girişiniz başarılı ancak bağlı bir Instagram İşletme Hesabı bulunamadı.</p>');
-    }
+    res.send(`<h1>Tebrikler! 🎉</h1><p>Instagram hesabınız sisteme başarıyla bağlandı. Artık yapay zekanız devrede. <a href="/">Panele Dön</a></p>`);
 
   } catch (error) {
     console.error('OAuth Hatası:', error.response ? error.response.data : error.message);
