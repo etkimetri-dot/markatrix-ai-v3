@@ -91,17 +91,75 @@ app.get('/auth/callback', async (req, res) => {
     db.brands[igId] = {
       name: "Yeni Müşteri (Instagram'dan Bağlandı)",
       access_token: userAccessToken,
-      system_prompt: `Sen profesyonel bir asistansın. Müşterilere doğrudan ve kısa cevaplar ver.`
+      system_prompt: `Sen profesyonel bir asistansın.` // Geçici prompt
     };
 
     fs.writeFileSync('./database.json', JSON.stringify(db, null, 2));
 
-    res.send(`<h1>Tebrikler! 🎉</h1><p>Instagram hesabınız sisteme başarıyla bağlandı. Artık yapay zekanız devrede. <a href="/">Panele Dön</a></p>`);
+    // 3. MÜŞTERİYE ÖZEL "YAPAY ZEKA KURULUM" SAYFASI
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+          <meta charset="UTF-8">
+          <title>Yapay Zeka Kurulumu</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+      </head>
+      <body class="bg-blue-50 flex items-center justify-center min-h-screen">
+          <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full text-center">
+              <h1 class="text-3xl font-bold text-blue-600 mb-2">🎉 Başardınız!</h1>
+              <p class="text-gray-600 mb-6">Instagram hesabınız sisteme başarıyla bağlandı.</p>
+              
+              <form action="/api/customer_setup/${igId}" method="POST" class="text-left space-y-4">
+                  <div>
+                      <label class="block font-bold text-gray-700 mb-2">Yapay Zekanız Nasıl Davransın? (Kurallar & Fiyatlar)</label>
+                      <textarea name="system_prompt" rows="6" class="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required placeholder="Örn: Sen bizim ajansımızın yapay zekasısın. Fiyatımız aylık 5000 TL..."></textarea>
+                  </div>
+                  <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition">
+                      Yapay Zekayı Aktif Et 🚀
+                  </button>
+              </form>
+          </div>
+      </body>
+      </html>
+    `);
 
   } catch (error) {
     console.error('OAuth Hatası:', error.response ? error.response.data : error.message);
     res.send('Bir hata oluştu. Lütfen sistem loglarını kontrol edin.');
   }
+});
+
+// API: Müşterinin kendi prompt'unu (kurallarını) kaydetmesi için
+app.post('/api/customer_setup/:id', express.urlencoded({ extended: true }), (req, res) => {
+  const fs = require('fs');
+  const brandId = req.params.id;
+  const newPrompt = req.body.system_prompt;
+
+  let db = { brands: {} };
+  try { db = JSON.parse(fs.readFileSync('./database.json', 'utf8')); } catch (err) {}
+
+  if (db.brands[brandId]) {
+    db.brands[brandId].system_prompt = newPrompt;
+    fs.writeFileSync('./database.json', JSON.stringify(db, null, 2));
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8"><title>Aktif Edildi</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-green-50 flex items-center justify-center min-h-screen text-center">
+        <div class="bg-white p-8 rounded-lg shadow-xl">
+            <h1 class="text-4xl mb-4">🚀</h1>
+            <h2 class="text-2xl font-bold text-green-600 mb-2">Yapay Zekanız Canlı Yayında!</h2>
+            <p class="text-gray-600">Müşterilerinizden gelen mesajlara belirlediğiniz kurallara göre cevap verilmeye başlandı. Bu sekmeyi kapatabilirsiniz.</p>
+        </div>
+    </body>
+    </html>
+  `);
 });
 
 app.use(express.static('public')); // Admin paneli için HTML klasörünü sun
